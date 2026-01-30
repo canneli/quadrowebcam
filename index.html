@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Felipe Canneli - 3D Cosmic Candy Slime Animado</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;900&display=swap');
+
+        :root {
+            --chroma-bg: #00ff00; /* Verde Chroma Key */
+            --chroma-hole: #0000ff; /* Azul Chroma Key */
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: var(--chroma-bg);
+            font-family: 'Outfit', sans-serif;
+        }
+
+        #three-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        /* Camada de brilho suave para finalizar o visual Candy */
+        .glow-overlay {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 2;
+            background: radial-gradient(circle, transparent 30%, rgba(255, 0, 255, 0.08) 100%);
+            box-shadow: inset 0 0 120px rgba(0, 255, 255, 0.15);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="three-container"></div>
+    <div class="glow-overlay"></div>
+
+    <script>
+        let scene, camera, renderer, frame, hole;
+        let originalPositions; // Para armazenar os vértices originais e aplicar a deformação
+        const cosmicElements = [];
+        const clock = new THREE.Clock();
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x00ff00); // Fundo Verde Chroma
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 22;
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.getElementById('three-container').appendChild(renderer.domElement);
+
+            // Luzes de Estúdio Candy Surrealism
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const pinkLight = new THREE.PointLight(0xff00ff, 2.5, 60);
+            pinkLight.position.set(12, 12, 15);
+            scene.add(pinkLight);
+
+            const cyanLight = new THREE.PointLight(0x00ffff, 2.5, 60);
+            cyanLight.position.set(-12, -8, 15);
+            scene.add(cyanLight);
+
+            const topLight = new THREE.DirectionalLight(0xffffff, 0.7);
+            topLight.position.set(0, 10, 5);
+            scene.add(topLight);
+
+            // 1. O BURACO DA CÂMERA (Chroma Azul)
+            const holeGeo = new THREE.PlaneGeometry(13.5, 8.2);
+            const holeMat = new THREE.MeshBasicMaterial({ color: 0x0000ff }); // Azul Chroma
+            hole = new THREE.Mesh(holeGeo, holeMat);
+            hole.position.z = -1.2; 
+            scene.add(hole);
+
+            // 2. A MOLDURA DE SLIME (3D com deformação de vértices)
+            createSlimeFrame();
+
+            // 3. ELEMENTOS CÓSMICOS (Planetas e Estrelas 3D)
+            createCosmicElements();
+
+            window.addEventListener('resize', onWindowResize);
+            animate();
+        }
+
+        function createSlimeFrame() {
+            // Criando a forma do retângulo arredondado
+            const shape = new THREE.Shape();
+            const w = 15.5, h = 10, r = 2.5;
+            shape.moveTo(-w/2 + r, -h/2);
+            shape.lineTo(w/2 - r, -h/2);
+            shape.quadraticCurveTo(w/2, -h/2, w/2, -h/2 + r);
+            shape.lineTo(w/2, h/2 - r);
+            shape.quadraticCurveTo(w/2, h/2, w/2 - r, h/2);
+            shape.lineTo(-w/2 + r, h/2);
+            shape.quadraticCurveTo(-w/2, h/2, -w/2, h/2 - r);
+            shape.lineTo(-w/2, -h/2 + r);
+            shape.quadraticCurveTo(-w/2, -h/2, -w/2 + r, -h/2);
+
+            // Configurações de extrusão com MAIS SEGMENTOS para animação suave
+            const extrudeSettings = {
+                depth: 1.0,
+                bevelEnabled: true,
+                bevelThickness: 0.6,
+                bevelSize: 0.6,
+                bevelSegments: 20, // Suaviza as bordas arredondadas
+                curveSegments: 40,  // Mais detalhes na curva do retângulo
+                steps: 15          // Mais divisões na profundidade para deformar o corpo
+            };
+
+            const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+            
+            // Armazenamos a posição original dos vértices
+            originalPositions = geometry.attributes.position.array.slice();
+
+            const material = new THREE.MeshPhongMaterial({
+                color: 0xff00ff,
+                shininess: 300,
+                transparent: true,
+                opacity: 0.9,
+                specular: 0xaaaaaa,
+                emissive: 0x330033
+            });
+
+            frame = new THREE.Mesh(geometry, material);
+            scene.add(frame);
+        }
+
+        function createCosmicElements() {
+            const types = ['planet', 'star', 'orb'];
+            for (let i = 0; i < 14; i++) {
+                const type = types[i % 3];
+                let mesh;
+
+                if (type === 'planet') {
+                    const group = new THREE.Group();
+                    const planetGeo = new THREE.SphereGeometry(0.7, 32, 32);
+                    const planetMat = new THREE.MeshPhongMaterial({ color: 0x00ffff, shininess: 150 });
+                    const planet = new THREE.Mesh(planetGeo, planetMat);
+                    group.add(planet);
+
+                    const ringGeo = new THREE.TorusGeometry(1.2, 0.06, 12, 48);
+                    const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
+                    const ring = new THREE.Mesh(ringGeo, ringMat);
+                    ring.rotation.x = Math.PI / 2.3;
+                    group.add(ring);
+                    mesh = group;
+                } else if (type === 'star') {
+                    const starGeo = new THREE.IcosahedronGeometry(0.65, 0);
+                    const starMat = new THREE.MeshPhongMaterial({ color: 0xffffff, emissive: 0x555555, shininess: 400 });
+                    mesh = new THREE.Mesh(starGeo, starMat);
+                } else {
+                    const orbGeo = new THREE.SphereGeometry(0.5, 32, 32);
+                    const orbMat = new THREE.MeshPhongMaterial({ color: 0xff0088, shininess: 500 });
+                    mesh = new THREE.Mesh(orbGeo, orbMat);
+                }
+
+                const element = {
+                    mesh: mesh,
+                    angle: (i / 14) * Math.PI * 2,
+                    speed: 0.15 + Math.random() * 0.25, 
+                    radiusX: 10 + Math.random() * 2.5,
+                    radiusY: 6.5 + Math.random() * 2,
+                    zBase: (Math.random() - 0.5) * 4,
+                    rotationSpeed: 0.4 + Math.random() * 0.8
+                };
+
+                scene.add(mesh);
+                cosmicElements.push(element);
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            const time = clock.getElapsedTime();
+
+            // 1. ANIMAÇÃO DAS BORDAS (Deformação de Vértices)
+            if (frame && originalPositions) {
+                const posAttribute = frame.geometry.attributes.position;
+                const array = posAttribute.array;
+
+                for (let i = 0; i < posAttribute.count; i++) {
+                    const ix = i * 3;
+                    const iy = i * 3 + 1;
+                    const iz = i * 3 + 2;
+
+                    const x = originalPositions[ix];
+                    const y = originalPositions[iy];
+                    const z = originalPositions[iz];
+
+                    // Aplicamos ondas de seno e cosseno baseadas na posição e no tempo
+                    // Isso faz as bordas "ondulem" organicamente
+                    const waveX = Math.sin(y * 0.6 + time * 1.5) * 0.15;
+                    const waveY = Math.cos(x * 0.6 + time * 1.5) * 0.15;
+                    const waveZ = Math.sin(x * 0.4 + y * 0.4 + time * 2) * 0.2;
+
+                    array[ix] = x + waveX;
+                    array[iy] = y + waveY;
+                    array[iz] = z + waveZ;
+                }
+                posAttribute.needsUpdate = true;
+                
+                // Leve balanço do objeto inteiro
+                frame.rotation.z = Math.sin(time * 0.4) * 0.02;
+                frame.position.y = Math.sin(time * 0.6) * 0.1;
+            }
+
+            // 2. Animação dos Elementos Orbitando
+            cosmicElements.forEach(el => {
+                el.angle += el.speed * delta;
+                
+                const cos = Math.cos(el.angle);
+                const sin = Math.sin(el.angle);
+                
+                // Órbita Retangular Arredondada Suave
+                el.mesh.position.x = Math.sign(cos) * Math.pow(Math.abs(cos), 0.78) * el.radiusX;
+                el.mesh.position.y = Math.sign(sin) * Math.pow(Math.abs(sin), 0.78) * el.radiusY;
+                
+                // Oscilação em Z para profundidade
+                el.mesh.position.z = el.zBase + Math.sin(el.angle * 2.5 + time) * 2.5;
+                
+                el.mesh.rotation.x += el.rotationSpeed * delta;
+                el.mesh.rotation.y += el.rotationSpeed * delta;
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        init();
+    </script>
+</body>
+</html>
